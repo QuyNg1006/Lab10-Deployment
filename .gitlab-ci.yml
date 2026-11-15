@@ -1,0 +1,37 @@
+# GitLab CI/CD variables to define (Settings > CI/CD > Variables):
+#   DOCKERHUB_USER, DOCKERHUB_TOKEN              (Docker Hub access token)
+#   SERVER_HOST, SERVER_USER, SSH_PRIVATE_KEY    (only for the deploy stage)
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+    - docker build -f MyWebApp/Dockerfile -t "$DOCKERHUB_USER/myaspnetcoreapp:latest" .
+    - docker push "$DOCKERHUB_USER/myaspnetcoreapp:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh "$SERVER_USER@$SERVER_HOST" "
+        docker pull $DOCKERHUB_USER/myaspnetcoreapp:latest &&
+        (docker rm -f myaspnetcoreappcontainer || true) &&
+        docker run -d -p 8080:8080 --restart unless-stopped --name myaspnetcoreappcontainer $DOCKERHUB_USER/myaspnetcoreapp:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

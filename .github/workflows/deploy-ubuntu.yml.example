@@ -1,0 +1,27 @@
+# OPTIONAL: rename to deploy-ubuntu.yml to also deploy to your Ubuntu server over SSH.
+# Extra secrets needed: SERVER_HOST, SERVER_USER, SERVER_SSH_KEY
+name: Deploy to Ubuntu
+
+on:
+  workflow_run:
+    workflows: ["Docker Image CI"]
+    types: [completed]
+    branches: [ main ]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_USERNAME }}/myaspnetcoreapp:latest
+            docker rm -f myaspnetcoreappcontainer || true
+            docker run -d -p 8080:8080 --restart unless-stopped \
+              --name myaspnetcoreappcontainer \
+              ${{ secrets.DOCKER_USERNAME }}/myaspnetcoreapp:latest

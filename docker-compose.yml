@@ -1,0 +1,9 @@
+# Run on the Ubuntu server:  sudo docker compose up -d
+# Replace <dockerhub_user> with your Docker Hub username.
+services:
+  web:
+    image: <dockerhub_user>/myaspnetcoreapp:latest
+    container_name: myaspnetcoreappcontainer
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
